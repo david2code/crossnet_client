@@ -124,7 +124,7 @@ int init()
 {
     signal_init();
 
-    unique_id_init();
+    //unique_id_init();
     notify_buf_table_init();
 
     backend_init();

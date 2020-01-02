@@ -20,7 +20,6 @@
 #include "log.h"
 #include "backend.h"
 #include "buff.h"
-#include "unique_id.h"
 #include "misc.h"
 #include "hash_table.h"
 
@@ -38,15 +37,11 @@ void backend_socket_buff_table_init()
 
 inline struct backend_sk_node *malloc_backend_socket_node()
 {
-    struct backend_sk_node *p_node = (struct backend_sk_node *)buff_table_malloc_node(&g_backend_socket_buff_table);
-    if (p_node)
-        p_node->seq_id = unique_id_get();
-    return p_node;
+    return (struct backend_sk_node *)buff_table_malloc_node(&g_backend_socket_buff_table);
 }
 
 inline void free_backend_socket_node(struct backend_sk_node *p_node)
 {
-    unique_id_put(p_node->seq_id);
     buff_table_free_node(&g_backend_socket_buff_table, &p_node->list_head);
 }
 
@@ -99,12 +94,9 @@ void backend_move_node_to_list(struct backend_sk_node *sk, int type)
     }
 }
 
-inline uint32_t unuse_hash(uint32_t *key)
-{
-    return (*key) % (g_backend_work_thread_table.hash.size);
-}
+#define BACKEND_ID_HASH(key) (*key)
 
-DHASH_GENERATE(p_backend_work_thread_table_array, backend_sk_node, id_hash_node, seq_id, uint32_t, unuse_hash, uint32_t_cmp);
+DHASH_GENERATE(g_backend_work_thread_table, backend_sk_node, id_hash_node, seq_id, uint32_t, BACKEND_ID_HASH, uint32_t_cmp);
 
 void backend_sk_raw_del(struct backend_sk_node *sk)
 {
@@ -132,6 +124,32 @@ void backend_sk_raw_del(struct backend_sk_node *sk)
     free_backend_socket_node(sk);
 }
 
+int backend_send_data_process(struct backend_sk_node *sk)
+{
+    struct notify_node *p_recv_node = sk->p_recv_node;
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
+    struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
+
+    uint32_t src_id = ntohl(p_data->src_id);
+    uint16_t total_len = ntohs(p_hdr->total_len);
+    uint16_t hdr_len = BACKEND_HDR_LEN + sizeof(struct backend_data);
+    uint16_t data_len = total_len - hdr_len;
+    uint8_t *p_send_data = (uint8_t *)p_hdr + hdr_len;
+    
+    struct backend_sk_node *p_node = DHASH_FIND(g_backend_work_thread_table, &g_backend_work_thread_table.hash, &src_id);
+    if (p_node == NULL) {
+
+    }
+
+
+    DBG_PRINTF(DBG_WARNING, "src_id %u data_len %hu\n",
+            src_id,
+            data_len);
+
+    log_dump_hex(p_send_data, data_len);
+    return 0;
+}
+
 int backend_deal_read_data_process(struct backend_sk_node *sk)
 {
     struct notify_node *p_recv_node = sk->p_recv_node;
@@ -143,6 +161,7 @@ int backend_deal_read_data_process(struct backend_sk_node *sk)
         break;
 
     case MSG_TYPE_SEND_DATA:
+        backend_send_data_process(sk);
         p_recv_node->end = p_recv_node->pos = 0;
         break;
 
@@ -461,6 +480,69 @@ void backend_socket_del_cb(void *v)
  * 0 成功
  * -1 失败
  */
+int backend_socket_connect_to_inner_server(uint32_t src_id)
+{
+    struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
+
+    int new_socket = 0;
+    int ret = create_socket_to_server_by_host(INNER_HOST, INNER_PORT, 0, &new_socket);
+    if (ret == -1) {
+        DBG_PRINTF(DBG_ERROR, "create connect socket failed at %s:%d, errnum: %d\n",
+                BACKEND_HOST,
+                BACKEND_PORT,
+                ret);
+        return -1;
+    }
+
+    struct backend_sk_node *p_node = malloc_backend_socket_node();
+    if (p_node == NULL) {
+        DBG_PRINTF(DBG_ERROR, "malloc socket node failed\n");
+        close(new_socket);
+        return -1;
+    }
+
+    time_t now = time(NULL);
+    p_node->fd              = new_socket;
+    p_node->seq_id          = src_id;
+    p_node->p_recv_node     = NULL;
+    p_node->last_active     = now;
+    p_node->last_hb_time    = 0;
+    p_node->type            = BACKEND_SOCKET_TYPE_INNER_SERVER;
+    p_node->blocked         = 0;
+
+    p_node->read_cb         = NULL;//backend_inner_socket_read_cb;
+    if (ret == 0) {
+        p_node->write_cb    = backend_socket_write_cb;
+        p_node->status      = SOCKET_STATUS_CONNECTED;
+    } else {
+        p_node->write_cb    = backend_socket_connect_cb;
+        p_node->status      = SOCKET_STATUS_CONNECTING;
+    }
+    p_node->exit_cb         = backend_socket_exit_cb;
+    p_node->del_cb          = backend_socket_del_cb;
+
+    INIT_LIST_HEAD(&p_node->send_list);
+
+    backend_add_node_to_list(p_node);
+
+    set_none_block(p_node->fd);
+    add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN | EPOLLOUT | EPOLLERR);
+
+    DBG_PRINTF(DBG_ERROR, "create connect socket success to %s:%d, socket:%d, errnum: %d\n",
+            BACKEND_HOST,
+            BACKEND_PORT,
+            p_node->fd,
+            ret);
+
+    return 0;
+}
+
+/*
+ * 创建到转发服务器的连接
+ * 返回值：
+ * 0 成功
+ * -1 失败
+ */
 int backend_socket_connect_to_server()
 {
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
@@ -632,6 +714,8 @@ int backend_init()
         INIT_LIST_HEAD(&p_table->list_head[j].list_head);
         p_table->list_head[j].num = 0;
     }
+    DHASH_INIT(g_backend_work_thread_table, &g_backend_work_thread_table.hash, BACKEND_THREAD_HASH_SIZE);
+
     backend_socket_buff_table_init();
 
     backend_socket_connect_to_server();

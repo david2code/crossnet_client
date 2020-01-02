@@ -88,6 +88,10 @@ struct backend_hdr {
 
 #define BACKEND_HDR_LEN (sizeof(struct backend_hdr))
 
+struct backend_data {
+    uint32_t  src_id;/*发送者的ID*/
+}__attribute__((packed));
+
 int backend_init();
 void *backend_process(void *arg);
 

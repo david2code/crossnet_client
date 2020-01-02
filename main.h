@@ -10,6 +10,9 @@
 #define BACKEND_PORT   66
 #define BACKEND_WORK_THREAD_NUM    4
 
+#define INNER_HOST   "www.baidu.com"
+#define INNER_PORT   443
+
 #define TABLE_NAME_LEN  50
 #define MAX_BUFF_SIZE            2048
 
