@@ -131,7 +131,7 @@ int backend_send_data_process(struct backend_sk_node *sk)
     struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
     struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
 
-    uint32_t src_id = ntohl(p_data->src_id);
+    uint32_t src_id = ntohl(p_data->session_id);
     uint16_t total_len = ntohs(p_hdr->total_len);
     uint16_t hdr_len = BACKEND_HDR_LEN + sizeof(struct backend_data);
 
@@ -207,7 +207,7 @@ int backend_inner_deal_read_data_process(struct backend_sk_node *sk)
     p_hdr->total_len    = htons(total_len);
 
     struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
-    p_data->src_id = htonl(sk->seq_id);
+    p_data->session_id = htonl(sk->seq_id);
 
     struct backend_sk_node *p_server_node = sk->peer;
     list_add_tail(&p_notify_node->list_head, &p_server_node->send_list);
@@ -721,7 +721,6 @@ int backend_socket_connect_to_server()
 
     return 0;
 }
-
 
 int backend_send_heart_beat(struct backend_sk_node *sk)
 {
