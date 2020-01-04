@@ -134,8 +134,6 @@ int backend_send_data_process(struct backend_sk_node *sk)
     uint32_t src_id = ntohl(p_data->src_id);
     uint16_t total_len = ntohs(p_hdr->total_len);
     uint16_t hdr_len = BACKEND_HDR_LEN + sizeof(struct backend_data);
-    uint16_t data_len = total_len - hdr_len;
-    uint8_t *p_send_data = (uint8_t *)p_hdr + hdr_len;
 
     struct backend_sk_node *p_node = DHASH_FIND(g_backend_work_thread_table, &g_backend_work_thread_table.hash, &src_id);
     if (p_node == NULL) {
@@ -149,10 +147,9 @@ int backend_send_data_process(struct backend_sk_node *sk)
         p_node->peer            = sk;
         sk->p_recv_node = NULL;
 
-        log_dump_hex(p_send_data, data_len);
 #if 1
         p_recv_node->pos += hdr_len;
-        log_dump_hex(p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+        DBG_DUMP_HEX(DBG_NORMAL, p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
         list_add_tail(&p_recv_node->list_head, &p_node->send_list);
         if (p_node->status == SOCKET_STATUS_CONNECTED)
             p_node->write_cb(p_node);
@@ -160,9 +157,9 @@ int backend_send_data_process(struct backend_sk_node *sk)
     }
 
 
-    DBG_PRINTF(DBG_WARNING, "src_id %u data_len %hu\n",
+    DBG_PRINTF(DBG_WARNING, "src_id %u total_len %hu\n",
             src_id,
-            data_len);
+            total_len);
 
     return 0;
 }
@@ -272,13 +269,13 @@ void backend_socket_read_cb(void *v)
                         total_len,
                         p_recv_node->pos,
                         p_recv_node->end);
-                log_dump_hex((const uint8_t *)p_hdr, n_recv);
+                DBG_DUMP_HEX(DBG_NORMAL, (const uint8_t *)p_hdr, n_recv);
                 sk->exit_cb((void *)sk);
                 break;
             }
 
             if (n_recv == total_len) {
-                log_dump_hex((const uint8_t *)p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+                //log_dump_hex((const uint8_t *)p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
                 backend_deal_read_data_process(sk);
                 continue;
             }
@@ -344,8 +341,7 @@ void backend_inner_socket_read_cb(void *v)
             }
         }
 
-        uint16_t n_recv = p_recv_node->end - p_recv_node->pos;
-        uint16_t to_recv = MAX_BUFF_SIZE - n_recv;
+        uint16_t to_recv = MAX_BUFF_SIZE - p_recv_node->end;
 
         int nread = recv(sk->fd, p_recv_node->buf + p_recv_node->end, to_recv, MSG_DONTWAIT);
         if (nread > 0) {
