@@ -146,6 +146,7 @@ int backend_send_data_process(struct backend_sk_node *sk)
         //TODO 回复close命令
         p_recv_node->end = p_recv_node->pos = 0;
     } else {
+        p_node->peer            = sk;
         sk->p_recv_node = NULL;
 
         log_dump_hex(p_send_data, data_len);
@@ -190,10 +191,32 @@ int backend_deal_read_data_process(struct backend_sk_node *sk)
 
 int backend_inner_deal_read_data_process(struct backend_sk_node *sk)
 {
-    struct notify_node *p_recv_node = sk->p_recv_node;
+    struct notify_node *p_notify_node = sk->p_recv_node;
+    sk->p_recv_node = NULL;
 
-    log_dump_hex(p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
-    p_recv_node->pos = p_recv_node->end = BACKEND_RESERVE_HDR_SIZE;
+    p_notify_node->type   = PIPE_NOTIFY_TYPE_SEND;
+    p_notify_node->dst_id = 0;
+
+    uint16_t control_len = BACKEND_HDR_LEN + sizeof(struct backend_data);
+    if (control_len > p_notify_node->pos) {
+        return -1;
+    }
+
+    uint16_t total_len = control_len + (p_notify_node->end - p_notify_node->pos);
+    p_notify_node->pos -= control_len;
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_notify_node->buf + p_notify_node->pos);
+    p_hdr->magic        = htons(BACKEND_MAGIC);
+    p_hdr->type         = MSG_TYPE_SEND_DATA;
+    p_hdr->total_len    = htons(total_len);
+
+    struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
+    p_data->src_id = htonl(sk->seq_id);
+
+    struct backend_sk_node *p_server_node = sk->peer;
+    list_add_tail(&p_notify_node->list_head, &p_server_node->send_list);
+    p_server_node->write_cb(p_server_node);
+
+    //log_dump_hex(p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
     return SUCCESS;
 }
 

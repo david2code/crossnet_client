@@ -10,9 +10,9 @@
 #define BACKEND_PORT   66
 #define BACKEND_WORK_THREAD_NUM    4
 
-#if 0
-#define INNER_HOST   "www.david.com"
-#define INNER_PORT   443
+#if 1
+#define INNER_HOST   ""
+#define INNER_PORT   22
 #else
 #define INNER_HOST   "xqctk.jtys.sz.gov.cn"
 #define INNER_PORT   80
