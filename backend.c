@@ -23,6 +23,7 @@
 #include "misc.h"
 #include "hash_table.h"
 
+struct backend_sk_node *backend_socket_connect_to_inner_server(uint32_t src_id);
 
 struct backend_work_thread_table g_backend_work_thread_table;
 
@@ -135,10 +136,26 @@ int backend_send_data_process(struct backend_sk_node *sk)
     uint16_t hdr_len = BACKEND_HDR_LEN + sizeof(struct backend_data);
     uint16_t data_len = total_len - hdr_len;
     uint8_t *p_send_data = (uint8_t *)p_hdr + hdr_len;
-    
+
     struct backend_sk_node *p_node = DHASH_FIND(g_backend_work_thread_table, &g_backend_work_thread_table.hash, &src_id);
     if (p_node == NULL) {
+        p_node = backend_socket_connect_to_inner_server(src_id);
+    }
 
+    if (p_node == NULL) {
+        //TODO 回复close命令
+        p_recv_node->end = p_recv_node->pos = 0;
+    } else {
+        sk->p_recv_node = NULL;
+
+        log_dump_hex(p_send_data, data_len);
+#if 1
+        p_recv_node->pos += hdr_len;
+        log_dump_hex(p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+        list_add_tail(&p_recv_node->list_head, &p_node->send_list);
+        if (p_node->status == SOCKET_STATUS_CONNECTED)
+            p_node->write_cb(p_node);
+#endif
     }
 
 
@@ -146,7 +163,6 @@ int backend_send_data_process(struct backend_sk_node *sk)
             src_id,
             data_len);
 
-    log_dump_hex(p_send_data, data_len);
     return 0;
 }
 
@@ -162,7 +178,6 @@ int backend_deal_read_data_process(struct backend_sk_node *sk)
 
     case MSG_TYPE_SEND_DATA:
         backend_send_data_process(sk);
-        p_recv_node->end = p_recv_node->pos = 0;
         break;
 
     default:
@@ -170,6 +185,15 @@ int backend_deal_read_data_process(struct backend_sk_node *sk)
         break;
     }
 
+    return SUCCESS;
+}
+
+int backend_inner_deal_read_data_process(struct backend_sk_node *sk)
+{
+    struct notify_node *p_recv_node = sk->p_recv_node;
+
+    log_dump_hex(p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+    p_recv_node->pos = p_recv_node->end = BACKEND_RESERVE_HDR_SIZE;
     return SUCCESS;
 }
 
@@ -242,6 +266,68 @@ void backend_socket_read_cb(void *v)
         int nread = recv(sk->fd, p_recv_node->buf + p_recv_node->end, to_recv, MSG_DONTWAIT);
         if (nread > 0) {
             p_recv_node->end += nread;
+            continue;
+        }
+
+        if (nread == 0) {
+            DBG_PRINTF(DBG_NORMAL, "socket %u:%d closed by peer\n",
+                    sk->seq_id,
+                    sk->fd);
+            sk->exit_cb((void *)sk);
+            break;
+        }
+
+        if (errno == EAGAIN) {
+            DBG_PRINTF(DBG_NORMAL, "socket %u:%d need recv next!\n",
+                    sk->seq_id,
+                    sk->fd);
+            break;
+        } else if (errno == EINTR) {
+            DBG_PRINTF(DBG_ERROR, "socket %u:%d need recv again!\n",
+                    sk->seq_id,
+                    sk->fd);
+            continue;
+        } else {
+            DBG_PRINTF(DBG_NORMAL, "socket %u:%d errno: %d\n",
+                    sk->seq_id,
+                    sk->fd,
+                    errno);
+            sk->exit_cb((void *)sk);
+            break;
+        }
+    }
+}
+
+void backend_inner_socket_read_cb(void *v)
+{
+    struct backend_sk_node *sk = (struct backend_sk_node *)v;
+
+    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND)
+        return;
+
+    sk->last_active = time(NULL);
+    while(1) {
+        struct notify_node *p_recv_node = sk->p_recv_node;
+        if (p_recv_node == NULL) {
+            p_recv_node = malloc_notify_node();
+            if (p_recv_node == NULL) {
+                DBG_PRINTF(DBG_WARNING, "socket %u:%d, no avaiable space, drop data!\n",
+                        sk->seq_id,
+                        sk->fd);
+                break;
+            } else {
+                p_recv_node->pos = p_recv_node->end = BACKEND_RESERVE_HDR_SIZE;
+                sk->p_recv_node = p_recv_node;
+            }
+        }
+
+        uint16_t n_recv = p_recv_node->end - p_recv_node->pos;
+        uint16_t to_recv = MAX_BUFF_SIZE - n_recv;
+
+        int nread = recv(sk->fd, p_recv_node->buf + p_recv_node->end, to_recv, MSG_DONTWAIT);
+        if (nread > 0) {
+            p_recv_node->end += nread;
+            backend_inner_deal_read_data_process(sk);
             continue;
         }
 
@@ -476,41 +562,50 @@ void backend_socket_del_cb(void *v)
 
 /*
  * 创建到真实服务器的连接
- * 返回值：
- * 0 成功
- * -1 失败
  */
-int backend_socket_connect_to_inner_server(uint32_t src_id)
+struct backend_sk_node *backend_socket_connect_to_inner_server(uint32_t src_id)
 {
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
 
     int new_socket = 0;
-    int ret = create_socket_to_server_by_host(INNER_HOST, INNER_PORT, 0, &new_socket);
+    uint32_t inner_ip = get_ip_by_hostname(INNER_HOST);
+    if (inner_ip == 0) {
+        return NULL;
+    }
+    //TODO forbidden circle connect
+#if 0
+    if (inner_ip == server_ip) {
+        return NULL;
+    }
+#endif
+    int ret = create_socket_to_server(inner_ip, INNER_PORT, 0, &new_socket);
     if (ret == -1) {
         DBG_PRINTF(DBG_ERROR, "create connect socket failed at %s:%d, errnum: %d\n",
-                BACKEND_HOST,
-                BACKEND_PORT,
+                INNER_HOST,
+                INNER_PORT,
                 ret);
-        return -1;
+        return NULL;
     }
 
     struct backend_sk_node *p_node = malloc_backend_socket_node();
     if (p_node == NULL) {
         DBG_PRINTF(DBG_ERROR, "malloc socket node failed\n");
         close(new_socket);
-        return -1;
+        return NULL;
     }
 
     time_t now = time(NULL);
     p_node->fd              = new_socket;
     p_node->seq_id          = src_id;
+    p_node->ip              = inner_ip;
+    p_node->port            = INNER_PORT;
     p_node->p_recv_node     = NULL;
     p_node->last_active     = now;
     p_node->last_hb_time    = 0;
     p_node->type            = BACKEND_SOCKET_TYPE_INNER_SERVER;
     p_node->blocked         = 0;
 
-    p_node->read_cb         = NULL;//backend_inner_socket_read_cb;
+    p_node->read_cb         = backend_inner_socket_read_cb;
     if (ret == 0) {
         p_node->write_cb    = backend_socket_write_cb;
         p_node->status      = SOCKET_STATUS_CONNECTED;
@@ -523,18 +618,27 @@ int backend_socket_connect_to_inner_server(uint32_t src_id)
 
     INIT_LIST_HEAD(&p_node->send_list);
 
+    if (-1 == DHASH_INSERT(g_backend_work_thread_table, &p_table->hash, p_node)) {
+        DBG_PRINTF(DBG_ERROR, "new socket %u:%d exist!\n",
+                p_node->seq_id,
+                p_node->fd);
+        close(new_socket);
+        free_backend_socket_node(p_node);
+        return NULL;
+    }
+
     backend_add_node_to_list(p_node);
 
     set_none_block(p_node->fd);
     add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN | EPOLLOUT | EPOLLERR);
 
     DBG_PRINTF(DBG_ERROR, "create connect socket success to %s:%d, socket:%d, errnum: %d\n",
-            BACKEND_HOST,
-            BACKEND_PORT,
+            INNER_HOST,
+            INNER_PORT,
             p_node->fd,
             ret);
 
-    return 0;
+    return p_node;
 }
 
 /*
@@ -670,10 +774,10 @@ void *backend_process(void *arg)
             struct backend_sk_node *sk = (struct backend_sk_node *)(p_table->events[i].data.ptr);
 
             if(p_table->events[i].events & EPOLLIN) {
-                sk->read_cb((void *)sk);
+                sk->read_cb(sk);
             } else if(p_table->events[i].events & EPOLLOUT) {
                 sk->blocked = 0;
-                sk->write_cb((void *)sk);
+                sk->write_cb(sk);
             } else {
                 DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d unknown event: %d\n",
                         sk->seq_id,

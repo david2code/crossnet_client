@@ -71,7 +71,7 @@ struct backend_work_thread_table {
 };
 
 #define BACKEND_MAGIC           0x5a5a
-#define MAX_IP_PROXY_HDR_SIZE   300
+#define BACKEND_RESERVE_HDR_SIZE    100
 
 enum msg_type {
     MSG_TYPE_HEART_BEAT,
