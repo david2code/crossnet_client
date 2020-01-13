@@ -704,7 +704,19 @@ int backend_socket_connect_to_server()
         p_node->status      = SOCKET_STATUS_CONNECTING;
     }
     p_node->exit_cb         = backend_socket_exit_cb;
-    p_node->del_cb          = backend_socket_del_cb;
+    //p_node->del_cb          = backend_socket_del_cb;
+
+    p_node->timer.hole      = BACKEND_HEAP_INVALID_HOLE;
+    p_node->timer.timeout   = time(NULL) + BACKEND_HEAP_INVALID_HOLE;
+    ret = add_heap_timer(&p_table->heap, &p_node->timer);
+    if (ret != 0) {
+        DBG_PRINTF(DBG_ERROR, "new socket %d seq_id %u add timer failed\n",
+                p_node->seq_id,
+                p_node->fd);
+        close(new_socket);
+        free_backend_socket_node(p_node);
+        return -1;
+    }
 
     INIT_LIST_HEAD(&p_node->send_list);
 
@@ -722,13 +734,66 @@ int backend_socket_connect_to_server()
     return 0;
 }
 
+/*
+ * 创建到转发服务器的连接
+ * 返回值：
+ * 0 成功
+ * -1 失败
+ */
+int backend_init_to_server_socket()
+{
+    struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
+
+    struct backend_sk_node *p_node = malloc_backend_socket_node();
+    if (p_node == NULL) {
+        DBG_PRINTF(DBG_ERROR, "malloc socket node failed\n");
+        return -1;
+    }
+
+    time_t now = time(NULL);
+    p_node->fd              = 0;
+    p_node->seq_id          = 1010;
+    p_node->p_recv_node     = NULL;
+    p_node->last_active     = now;
+    p_node->last_hb_time    = 0;
+    p_node->type            = BACKEND_SOCKET_TYPE_OUTER_SERVER;
+    p_node->blocked         = 0;
+
+    p_node->read_cb         = NULL;
+    p_node->write_cb        = NULL;
+    p_node->exit_cb         = backend_socket_exit_cb;
+    p_node->status          = SOCKET_STATUS_CONNECTING;
+
+    p_node->event           = STE_TO_CONNECT;
+    p_node->timer.hole      = BACKEND_HEAP_INVALID_HOLE;
+    p_node->timer.timeout   = time(NULL) + BACKEND_HEAP_INVALID_HOLE;
+    int ret = add_heap_timer(&p_table->heap, &p_node->timer);
+    if (ret != 0) {
+        DBG_PRINTF(DBG_ERROR, "new socket %d seq_id %u add timer failed\n",
+                p_node->seq_id,
+                p_node->fd);
+        free_backend_socket_node(p_node);
+        return -1;
+    }
+
+    INIT_LIST_HEAD(&p_node->send_list);
+
+    DBG_PRINTF(DBG_ERROR, "init socket success to %s:%d, socket:%d, errnum: %d\n",
+            BACKEND_HOST,
+            BACKEND_PORT,
+            p_node->fd,
+            ret);
+
+    return 0;
+}
+
 int backend_send_heart_beat(struct backend_sk_node *sk)
 {
     sk->last_hb_time = time(NULL);
 
     DBG_PRINTF(DBG_WARNING, "sk %d, send heart beat\n",
             sk->seq_id);
-    
+
     struct notify_node *p_notify_node = malloc_notify_node();
     if (p_notify_node == NULL)
         return FAIL;
@@ -743,7 +808,7 @@ int backend_send_heart_beat(struct backend_sk_node *sk)
     p_hdr->type         = MSG_TYPE_HEART_BEAT;
     p_hdr->total_len    = htons(total_len);
     p_notify_node->end  = total_len;
-    
+
     list_add_tail(&p_notify_node->list_head, &sk->send_list);
     sk->write_cb((void *)sk);
     return 0;
@@ -773,6 +838,41 @@ void backend_heart_beat_process(struct list_table *p_list_table, char *table_nam
     }
 
     DBG_PRINTF(DBG_WARNING, "%s list table: %d total_num: %u, old: %d, delay: %d\n", table_name, total_num, count, time(NULL) - now);
+}
+
+void backend_timer_process(struct backend_work_thread_table *p_table)
+{
+    struct heap_timer *p_top_timer = NULL;
+    time_t now = time(NULL);
+    time_t old_time = now - BACKEND_SOCKET_TIMEOUT;
+
+    while((p_top_timer = top_heap_timer(&p_table->heap))) {
+        if (p_top_timer->timeout > now) {
+            break;
+        }
+
+        //timeout
+        struct backend_sk_node *p_entry = list_entry(p_top_timer, struct backend_sk_node, timer);
+
+        switch(p_entry->event) {
+        case STE_TO_CONNECT:
+            backend_socket_connect_to_server();
+            break;
+        }
+        if (p_entry->last_active <= old_time) {
+            DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d timeout:%u\n",
+                    p_entry->seq_id,
+                    p_entry->fd,
+                    p_entry->type,
+                    p_entry->timer.timeout);
+            p_entry->exit_cb(p_entry);
+        } else {
+            pop_heap_timer(&p_table->heap);
+            p_entry->timer.timeout = p_entry->last_active + BACKEND_SOCKET_TIMEOUT;
+            p_entry->timer.hole = BACKEND_HEAP_MAX_SIZE;
+            add_heap_timer(&p_table->heap, &p_entry->timer);
+        }
+    }
 }
 
 void *backend_process(void *arg)
@@ -805,8 +905,9 @@ void *backend_process(void *arg)
             }
         }
 
+        backend_timer_process(p_table);
         time_t now = time(NULL);
-        if ((now - last_time) > 10) {
+        if ((now - last_time) > (BACKEND_SOCKET_TIMEOUT - 2)) {
             last_time = now;
             backend_heart_beat_process(&p_table->list_head[BACKEND_SOCKET_TYPE_OUTER_SERVER], p_table->table_name);
         }
@@ -840,7 +941,14 @@ int backend_init()
 
     backend_socket_buff_table_init();
 
-    backend_socket_connect_to_server();
+    int ret = init_heap_timer(&g_backend_work_thread_table.heap, BACKEND_HEAP_MAX_SIZE);
+    if (ret != 0) {
+        perror("heap timer create failed!");
+        exit(EXIT_FAILURE);
+    }
+
+    //backend_socket_connect_to_server();
+    backend_init_to_server_socket();
     return 0;
 }
 
