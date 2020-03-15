@@ -842,8 +842,7 @@ void backend_timer_process(struct backend_work_thread_table *p_table)
         pop_heap_timer(&p_table->heap);
         struct backend_sk_node *p_entry = list_entry(p_top_timer, struct backend_sk_node, timer);
 
-        DBG_PRINTF(DBG_ERROR, "%p %u:%d, type:%d event %d timeout:%u\n",
-                p_entry,
+        DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d event %d timeout:%u\n",
                 p_entry->seq_id,
                 p_entry->fd,
                 p_entry->type,
@@ -863,12 +862,6 @@ void backend_timer_process(struct backend_work_thread_table *p_table)
                 p_entry->event       = STE_CONNECTING;
                 p_entry->timer.timeout   = time(NULL) + BACKEND_SOCKET_CONNECTING_TIMEOUT;
             }
-        DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d event %d timeout:%u\n",
-                p_entry->seq_id,
-                p_entry->fd,
-                p_entry->type,
-                p_entry->event,
-                p_entry->timer.timeout);
 
             p_entry->timer.hole      = BACKEND_HEAP_INVALID_HOLE;
             ret = add_heap_timer(&p_table->heap, &p_entry->timer);

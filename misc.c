@@ -325,10 +325,9 @@ int create_socket_to_server(uint32_t ip, uint16_t port, int connect_timeout, int
 
 int create_socket_to_server_by_host(char *host, uint16_t port, int connect_timeout, int *fd)
 {
-    struct sockaddr_in server_addr;
-    inet_aton(host, &server_addr.sin_addr);
+    uint32_t ip = get_ip_by_hostname(host);
 
-    return create_socket_to_server_on_eth(0, 0, ntohl(server_addr.sin_addr.s_addr), port, connect_timeout, fd);
+    return create_socket_to_server_on_eth(0, 0, ip, port, connect_timeout, fd);
 }
 
 #endif
