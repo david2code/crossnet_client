@@ -681,14 +681,6 @@ int backend_socket_connect_to_server(struct backend_sk_node *p_node)
                 ret);
         return -1;
     }
-#if 0
-    p_node = malloc_backend_socket_node();
-    if (p_node == NULL) {
-        DBG_PRINTF(DBG_ERROR, "malloc socket node failed\n");
-        return -1;
-    }
-#endif
-
 
     time_t now = time(NULL);
     p_node->fd              = new_socket;
@@ -742,7 +734,6 @@ int backend_init_to_server_socket()
         DBG_PRINTF(DBG_ERROR, "malloc socket node failed\n");
         return -1;
     }
-    //p_node = malloc_backend_socket_node();
 
     time_t now = time(NULL);
     p_node->fd              = 0;
@@ -779,7 +770,6 @@ int backend_init_to_server_socket()
             p_node->fd,
             ret);
 
-    //*p_entry = p_node;
     return 0;
 }
 
@@ -935,14 +925,10 @@ void *backend_process(void *arg)
     prctl(PR_SET_NAME, p_table->table_name);
 
     DBG_PRINTF(DBG_WARNING, "%s enter timerstamp %d\n", p_table->table_name, last_time);
-    //struct backend_sk_node *p_entry;
 
-    //backend_init_to_server_socket();
-    bool go = false;
     while(g_main_running) {
         int nfds = epoll_wait(p_table->epfd, p_table->events, BACKEND_THREAD_EPOLL_MAX_EVENTS, 1 * 1000);
 
-    DBG_PRINTF(DBG_ERROR, "p_table nfds: %d\n", nfds);
         int i;
         for( i= 0; i < nfds; ++i) {
             struct backend_sk_node *sk = (struct backend_sk_node *)(p_table->events[i].data.ptr);
@@ -962,10 +948,6 @@ void *backend_process(void *arg)
         }
 
         backend_timer_process(p_table);
-        if (go) {
-            go = false;
-         //backend_socket_connect_to_server(p_entry);
-        }
 #if 0
         time_t now = time(NULL);
         if ((now - last_time) > (BACKEND_SOCKET_TIMEOUT - 2)) {
