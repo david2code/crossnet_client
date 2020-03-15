@@ -6,7 +6,7 @@
 
 #define USER_NUM      100
 
-#define BACKEND_HOST   "www.david.com"
+#define BACKEND_HOST   "www.code.com"
 #define BACKEND_PORT   66
 #define BACKEND_WORK_THREAD_NUM    4
 

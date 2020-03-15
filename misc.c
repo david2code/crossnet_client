@@ -215,15 +215,11 @@ int set_none_block(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0)
-    {
         return -1;
-    }
     
     int r = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     if (r < 0)
-    {
         return -1;
-    }
 
     return 0;
 }
@@ -279,7 +275,7 @@ int create_socket_to_server_on_eth(uint32_t bind_ip, uint16_t bind_port, uint32_
         server_addr.sin_addr.s_addr = htonl(bind_ip);
         server_addr.sin_port = htons(bind_port);
 
-        if( bind(socket_fd,(struct sockaddr*)&server_addr,sizeof(server_addr)))
+        if (bind(socket_fd,(struct sockaddr*)&server_addr,sizeof(server_addr)))
             return -1;
     }
  
