@@ -15,10 +15,13 @@
 #define BACKEND_THREAD_EPOLL_MAX_EVENTS     (BACKEND_ACCEPT_EPOLL_MAX_EVENTS / BACKEND_WORK_THREAD_NUM)
 #define BACKEND_THREAD_LISTEN_BACKLOG       (BACKEND_ACCEPT_LISTEN_BACKLOG / BACKEND_WORK_THREAD_NUM)
 
-#define BACKEND_SOCKET_TIMEOUT              4
-#define BACKEND_SOCKET_RECONNECT_TIMEOUT              10
-#define BACKEND_SOCKET_CONNECTING_TIMEOUT              10
-#define BACKEND_SOCKET_CONNECTED_TIMEOUT              10
+#define BACKEND_SOCKET_HEART_BEAT_TIMEOUT           10
+
+#define BACKEND_SOCKET_TIMEOUT                        30
+#define BACKEND_SOCKET_RECONNECT_TIMEOUT              2
+#define BACKEND_SOCKET_CONNECTING_TIMEOUT             5
+#define BACKEND_SOCKET_CONNECTED_TIMEOUT              5
+
 #define BACKEND_NOTIFY_MAX_NODE             (BACKEND_SOCKET_MAX_NUM)
 
 #define BACKEND_HEAP_MAX_SIZE               (BACKEND_SOCKET_MAX_NUM)
@@ -30,6 +33,7 @@ enum sk_timer_event {
     STE_CONNECTED,
     STE_MAX
 };
+
 struct backend_sk_node {
     struct list_head    list_head;
     struct list_head    id_hash_node;

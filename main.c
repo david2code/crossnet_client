@@ -20,7 +20,7 @@
 #include "unique_id.h"
 
 int g_main_running = 1;
-int g_main_debug = DBG_WARNING;
+int g_main_debug = DBG_NORMAL;
 
 void *timer_process(void *arg)
 {
