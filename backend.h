@@ -56,8 +56,6 @@ struct backend_sk_node {
     time_t              last_active;
     time_t              last_hb_time; /* last heart beat time */
 
-    uint8_t             status;
-
     uint8_t             type;
     uint8_t             blocked;
 

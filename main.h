@@ -25,14 +25,6 @@
 #define FAIL       -1
 #define NEED_MORE  -2
 
-enum socket_status {
-    SOCKET_STATUS_CONNECTING = 0,
-    SOCKET_STATUS_CONNECTED,
-    SOCKET_STATUS_UNUSE_AFTER_SEND,
-    SOCKET_STATUS_DEL,/* socket需要被删除 */
-    SOCKET_STATUS_MAX
-};
-
 struct list_table {
     struct list_head    list_head;
     uint32_t            num;

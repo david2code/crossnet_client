@@ -260,7 +260,7 @@ void backend_outer_socket_read_cb(void *v)
 {
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
 
-    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND)
+    if (sk->event != STE_CONNECTED)
         return;
 
     sk->last_active = time(NULL);
@@ -361,7 +361,7 @@ void backend_inner_socket_read_cb(void *v)
 {
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
 
-    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND)
+    if (sk->event != STE_CONNECTED)
         return;
 
     sk->last_active = time(NULL);
@@ -430,11 +430,11 @@ void backend_socket_write_cb(void *v)
     int fd = sk->fd;
     uint32_t seq_id = sk->seq_id;
 
-    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND) {
-        DBG_PRINTF(DBG_WARNING, "seq_id %u:%d status %d!\n",
+    if (sk->event != STE_CONNECTED) {
+        DBG_PRINTF(DBG_WARNING, "seq_id %u:%d event %d!\n",
                 seq_id,
                 fd,
-                sk->status);
+                sk->event);
         return;
     }
 
@@ -511,11 +511,7 @@ void backend_socket_write_cb(void *v)
         }
     }
 
-    if (sk->status == SOCKET_STATUS_UNUSE_AFTER_SEND) {
-        sk->exit_cb((void *)sk);
-    } else {
-        modify_event(p_table->epfd, fd, (void *)sk, EPOLLIN);// | EPOLLET);
-    }
+    modify_event(p_table->epfd, fd, (void *)sk, EPOLLIN);// | EPOLLET);
 
 WRITE_EXIT:
     return;
@@ -542,7 +538,6 @@ void backend_socket_connect_cb(void *v)
     DBG_PRINTF(DBG_CLOSE, "%u, connect success\n",
             fd);
 
-    sk->status   = SOCKET_STATUS_CONNECTED;
     sk->write_cb = backend_socket_write_cb;
     sk->event = STE_CONNECTED;
 }
@@ -555,7 +550,6 @@ void backend_outer_socket_exit_cb(void *v)
     delete_event(p_table->epfd, sk->fd, sk, EPOLLIN | EPOLLOUT);
 
     close(sk->fd);
-    sk->status = SOCKET_STATUS_DEL;
     backend_del_node_from_list(sk);
 
     del_heap_timer(&p_table->heap, sk->timer.hole);
@@ -602,17 +596,9 @@ void backend_socket_exit_cb(void *v)
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
 
-    if (sk->status == SOCKET_STATUS_DEL) {
-        DBG_PRINTF(DBG_ERROR, "seq_id %u:%d critical error alread del\n",
-                sk->seq_id,
-                sk->fd);
-        return;
-    }
-
     delete_event(p_table->epfd, sk->fd, sk, EPOLLIN | EPOLLOUT);
 
     close(sk->fd);
-    sk->status = SOCKET_STATUS_DEL;
 
     del_heap_timer(&p_table->heap, sk->timer.hole);
 
@@ -641,12 +627,11 @@ void backend_socket_del_cb(void *v)
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
 
     if (sk->type != BACKEND_SOCKET_TYPE_DEL) {
-        DBG_PRINTF(DBG_ERROR, "user %u critical error %u:%d last_active: %d type: %hhu status: %hhu\n",
+        DBG_PRINTF(DBG_ERROR, "user %u critical error %u:%d last_active: %d type: %hhu\n",
                 sk->seq_id,
                 sk->fd,
                 sk->last_active,
-                sk->type,
-                sk->status);
+                sk->type);
     }
 
     struct list_table *p_list_table = &p_table->list_head[sk->type];
@@ -717,10 +702,8 @@ int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node)
     p_node->read_cb         = backend_inner_socket_read_cb;
     if (ret == 0) {
         p_node->write_cb    = backend_socket_write_cb;
-        p_node->status      = SOCKET_STATUS_CONNECTED;
     } else {
         p_node->write_cb    = backend_socket_connect_cb;
-        p_node->status      = SOCKET_STATUS_CONNECTING;
     }
     p_node->exit_cb         = backend_socket_exit_cb;
     p_node->del_cb          = backend_socket_del_cb;
@@ -780,10 +763,8 @@ int backend_socket_connect_to_server(struct backend_sk_node *p_node)
     p_node->read_cb         = backend_outer_socket_read_cb;
     if (ret == 0) {
         p_node->write_cb    = backend_socket_write_cb;
-        p_node->status      = SOCKET_STATUS_CONNECTED;
     } else {
         p_node->write_cb    = backend_socket_connect_cb;
-        p_node->status      = SOCKET_STATUS_CONNECTING;
     }
     p_node->exit_cb         = backend_outer_socket_exit_cb;
     //p_node->del_cb          = backend_socket_del_cb;
@@ -833,7 +814,6 @@ int backend_init_to_server_socket()
     p_node->read_cb         = NULL;
     p_node->write_cb        = NULL;
     p_node->exit_cb         = backend_socket_exit_cb;
-    p_node->status          = SOCKET_STATUS_CONNECTING;
 
     p_node->event           = STE_INIT;
     p_node->timer.hole      = BACKEND_HEAP_INVALID_HOLE;
@@ -884,32 +864,6 @@ int backend_send_heart_beat(struct backend_sk_node *sk)
     list_add_tail(&p_notify_node->list_head, &sk->send_list);
     sk->write_cb((void *)sk);
     return 0;
-}
-
-void backend_heart_beat_process(struct list_table *p_list_table, char *table_name)
-{
-    int                         count = 0;
-    time_t                      now = time(NULL);
-    time_t                      hb_time = now - 30;
-    uint32_t                    total_num = p_list_table->num;
-    struct list_head            *p_list = NULL;
-
-    list_for_each(p_list, &p_list_table->list_head) {
-        struct backend_sk_node *p_entry = list_entry(p_list, struct backend_sk_node, list_head);
-        if (p_entry->status == SOCKET_STATUS_CONNECTED) {
-            if (p_entry->last_hb_time < hb_time) {
-                backend_send_heart_beat(p_entry);
-            }
-        } else {
-	        DBG_PRINTF(DBG_WARNING, "critical error at: %s %u:%d status %d\n",
-                table_name,
-                p_entry->seq_id,
-                p_entry->fd,
-                p_entry->status);
-        }
-    }
-
-    DBG_PRINTF(DBG_WARNING, "%s list table: %d total_num: %u, old: %d, delay: %d\n", table_name, total_num, count, time(NULL) - now);
 }
 
 void backend_outer_event_process(struct backend_work_thread_table *p_table, struct backend_sk_node *p_entry)
