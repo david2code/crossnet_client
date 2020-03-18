@@ -25,6 +25,21 @@
 #define FAIL       -1
 #define NEED_MORE  -2
 
+#define HOST_MAX_LEN            100
+#define USER_NAME_MAX_LEN       100
+#define PASSWORD_MAX_LEN        100
+
+struct ctx {
+    char        server_ip[HOST_MAX_LEN + 1];
+    uint16_t    server_port;
+
+    char        user_name[USER_NAME_MAX_LEN + 1];
+    char        password[USER_NAME_MAX_LEN + 1];
+
+    char        my_ip[HOST_MAX_LEN + 1];
+    uint16_t    my_port;
+};
+
 struct list_table {
     struct list_head    list_head;
     uint32_t            num;

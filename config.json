@@ -1,0 +1,9 @@
+{
+    "server_ip": "www.code.com",
+    "server_port": 81,
+
+    "my_ip": "www.code.com",
+    "my_port": 80,
+    "user_name": "yikeshu",
+    "password": "12345678"
+}

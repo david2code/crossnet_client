@@ -21,6 +21,7 @@
 
 int g_main_running = 1;
 int g_main_debug = DBG_NORMAL;
+struct ctx g_ctx;
 
 void *timer_process(void *arg)
 {
@@ -131,6 +132,88 @@ int init()
 
     return 0;
 }
+#if 0
+void parse_json_result(char *result, struct ip_info_node_t *p_node)
+{
+    json_object *obj = json_tokener_parse(result);
+    if (!obj)
+    {   
+        return;
+    }
+
+    json_type type = json_object_get_type(obj);
+    if(type != json_type_object)
+    {   
+        goto JSON_ERROR_END;
+    }
+
+    json_object_object_foreach(obj, key, val)
+    {   
+        if (strcmp(key, "code") == 0)
+        {   
+            int code = -1;
+            json_type type =json_object_get_type(val);
+            if(type == json_type_int)
+                code = json_object_get_int(val);
+
+            if (code != 0)
+            {   
+                goto JSON_ERROR_END;
+            }
+        }
+        else if (strcmp(key, "data") == 0)
+        {   
+            json_type type =json_object_get_type(val);
+            if(type == json_type_object)
+            {   
+                parse_json_data(val, p_node);
+            }
+        }
+    }
+
+JSON_ERROR_END:
+    json_object_put(obj);
+}
+#endif
+
+int load_config_from_file(char *config)
+{
+    FILE  *fp        = NULL;
+    char buffer[2048] = {0};
+    int ret = 0;
+
+    if (config == NULL)
+        return -1;
+
+    if (NULL == (fp = fopen(config, "r"))) {
+        DBG_PRINTF( DBG_WARNING, "open %s failed!\n", config);
+        return -1;
+    }
+
+    ret = fread(buffer, 1, 2048, fp);
+    if (ret <= 0) {
+        return -1;
+    }
+    if (ret >= 2048) {
+        return -1;
+    }
+
+    printf("%d\n", ret);
+    printf("%s\n", buffer);
+
+    return 0;
+}
+
+void print_ctx()
+{
+    struct ctx *p_ctx = &g_ctx;
+
+    printf("server: %s\n", p_ctx->server_ip);
+    printf("user_name: %s\n", p_ctx->user_name);
+    printf("password: %s\n", p_ctx->password);
+    printf("my_ip: %s\n", p_ctx->my_ip);
+    printf("my_port: %hu\n", p_ctx->my_port);
+}
 
 /*
  * 启动后根据配置,连接服务器
@@ -142,7 +225,8 @@ int init()
 int main(int argc, char **argv)
 {
     bool daemon = false;
-    char *config = "main.conf";
+    char *config = "config.json";
+    int len;
 
     int c, option_index;
     static struct option long_options[] = {
@@ -150,10 +234,14 @@ int main(int argc, char **argv)
         {"config",  required_argument,  NULL,   'c'},
         {"version", no_argument,        NULL,   'v'},
         {"server",  required_argument,  NULL,   's'},
+        {"user_name",  required_argument,  NULL,   'u'},
+        {"password",  required_argument,  NULL,   'p'},
+        {"my_ip",  required_argument,  NULL,   'I'},
+        {"my_port",  required_argument,  NULL,   'P'},
         {NULL,      0,                  NULL,   0}
     };
 
-    while (-1 != (c = getopt_long(argc, argv, "dc:v:s", long_options, &option_index))) {
+    while (-1 != (c = getopt_long(argc, argv, "dc:v:s:u:p:I:P:", long_options, &option_index))) {
         switch (c) {
         case 'd':
             daemon = true;
@@ -161,7 +249,6 @@ int main(int argc, char **argv)
 
         case 'c':
             config = optarg;
-            (void)config;
             //printf("config %s\n", config);
             break;
 
@@ -170,17 +257,66 @@ int main(int argc, char **argv)
             exit(0);
             break;
 
+        case 's':
+            len = strlen(optarg);
+            if (len > HOST_MAX_LEN) {
+                printf("%s too much long, should less than %d charaters\n", optarg, HOST_MAX_LEN);
+                exit(0);
+            } else {
+                strncpy(g_ctx.server_ip, optarg, HOST_MAX_LEN);
+                g_ctx.server_ip[HOST_MAX_LEN] = 0;
+            }
+            break;
+
+        case 'u':
+            len = strlen(optarg);
+            if (len > USER_NAME_MAX_LEN) {
+                printf("%s too much long, should less than %d charaters\n", optarg, USER_NAME_MAX_LEN);
+                exit(0);
+            } else {
+                strncpy(g_ctx.user_name, optarg, USER_NAME_MAX_LEN);
+                g_ctx.user_name[USER_NAME_MAX_LEN] = 0;
+            }
+            break;
+
+        case 'p':
+            len = strlen(optarg);
+            if (len > PASSWORD_MAX_LEN) {
+                printf("%s too much long, should less than %d charaters\n", optarg, PASSWORD_MAX_LEN);
+                exit(0);
+            } else {
+                strncpy(g_ctx.password, optarg, PASSWORD_MAX_LEN);
+                g_ctx.password[PASSWORD_MAX_LEN] = 0;
+            }
+            break;
+
+
+        case 'I':
+            len = strlen(optarg);
+            if (len > HOST_MAX_LEN) {
+                printf("%s too much long, should less than %d charaters\n", optarg, HOST_MAX_LEN);
+                exit(0);
+            } else {
+                strncpy(g_ctx.my_ip, optarg, HOST_MAX_LEN);
+                g_ctx.my_ip[HOST_MAX_LEN] = 0;
+            }
+            break;
+
+        case 'P':
+            sscanf(optarg, "%hu", &g_ctx.my_port);
+            break;
+
         default:
             printf("?? getopt returned character code 0%o ??\n", c);
             exit(EXIT_FAILURE);
         }
     }
 
-#if 0
-    if (-1 == load_config_from_file(config, my_index, my_name)) {
+    if (-1 == load_config_from_file(config)) {
         exit(EXIT_FAILURE);
     }
-#endif
+
+    print_ctx();
 
     log_init("/var/log/crossnet_client.log");
 
