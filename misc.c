@@ -37,13 +37,9 @@ uint32_t get_ip_by_hostname(const char *hostname)
     struct hostent* hostent = gethostbyname(hostname);
 
     if (hostent == NULL)
-    {
         return 0;
-    }
     else
-    {
         return ntohl(*(uint32_t *)hostent->h_addr);
-    }
 }
 
 #if 1  
@@ -275,8 +271,10 @@ int create_socket_to_server_on_eth(uint32_t bind_ip, uint16_t bind_port, uint32_
         server_addr.sin_addr.s_addr = htonl(bind_ip);
         server_addr.sin_port = htons(bind_port);
 
-        if (bind(socket_fd,(struct sockaddr*)&server_addr,sizeof(server_addr)))
+        if (bind(socket_fd,(struct sockaddr*)&server_addr,sizeof(server_addr))) {
+            close(socket_fd);
             return -1;
+        }
     }
  
     int opt =1;
@@ -297,10 +295,13 @@ int create_socket_to_server_on_eth(uint32_t bind_ip, uint16_t bind_port, uint32_
         else if (ret == -1) {
             if (errno == EINPROGRESS)
                 return -3;
-            else
+            else {
+                close(socket_fd);
                 return -1;
+            }
         }
         else {
+            close(socket_fd);
             return -1;
         }
     } else {

@@ -22,6 +22,9 @@
 #define BACKEND_SOCKET_CONNECTING_TIMEOUT             5
 #define BACKEND_SOCKET_CONNECTED_TIMEOUT              5
 
+#define BACKEND_INNER_SOCKET_CONNECTING_TIMEOUT             5
+#define BACKEND_INNER_SOCKET_CONNECTED_TIMEOUT              5
+
 #define BACKEND_NOTIFY_MAX_NODE             (BACKEND_SOCKET_MAX_NUM)
 
 #define BACKEND_HEAP_MAX_SIZE               (BACKEND_SOCKET_MAX_NUM)
@@ -63,7 +66,7 @@ struct backend_sk_node {
     uint32_t            delay_ms;
 
     struct heap_timer   timer;
-    enum sk_timer_event event; /*指明到期后，要执行的事件*/
+    enum sk_timer_event event; /*state machine*/
 
     void                (*read_cb)(void *v);
     void                (*write_cb)(void *v);

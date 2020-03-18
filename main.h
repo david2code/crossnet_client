@@ -10,7 +10,7 @@
 #define BACKEND_PORT   66
 #define BACKEND_WORK_THREAD_NUM    4
 
-#if 1
+#if 0
 #define INNER_HOST   "www.david.com"
 #define INNER_PORT   8080 
 #else
@@ -28,7 +28,6 @@
 enum socket_status {
     SOCKET_STATUS_CONNECTING = 0,
     SOCKET_STATUS_CONNECTED,
-    SOCKET_STATUS_EXIT_AFTER_SEND,/* socket需要被关闭 */
     SOCKET_STATUS_UNUSE_AFTER_SEND,
     SOCKET_STATUS_DEL,/* socket需要被删除 */
     SOCKET_STATUS_MAX
