@@ -1004,7 +1004,7 @@ void backend_timer_process(struct backend_work_thread_table *p_table)
         if (p_entry->type == BACKEND_SOCKET_TYPE_OUTER_SERVER)
             backend_outer_event_process(p_table, p_entry);
         else
-            backend_outer_event_process(p_table, p_entry);
+            backend_inner_event_process(p_table, p_entry);
 
     }
 }

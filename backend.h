@@ -101,6 +101,8 @@ struct backend_work_thread_table {
 enum msg_type {
     MSG_TYPE_HEART_BEAT,
     MSG_TYPE_HEART_BEAT_ACK,
+    MSG_TYPE_HEART_CHALLENGE,
+    MSG_TYPE_HEART_BEAT_ACK,
     MSG_TYPE_SEND_DATA,
     MSG_TYPE_MAX,
 };
