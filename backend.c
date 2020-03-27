@@ -15,6 +15,7 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <arpa/inet.h>
+#include <openssl/md5.h>
 
 #include "main.h"
 #include "log.h"
@@ -22,6 +23,8 @@
 #include "buff.h"
 #include "misc.h"
 #include "hash_table.h"
+
+extern struct ctx g_ctx;
 
 int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node);
 
@@ -195,12 +198,86 @@ int backend_send_data_process(struct backend_sk_node *sk)
     return 0;
 }
 
+int user_make_md5(uint8_t *md5, char *password, uint32_t salt)
+{
+#define MD5_STR_BUF_LEN   (PASSWORD_MAX_LEN + 20)
+    uint8_t md5_str_buf[MD5_STR_BUF_LEN + 1] = {0};
+    size_t  md5_str_buf_len;
+
+    md5_str_buf_len = snprintf((char *)md5_str_buf, MD5_STR_BUF_LEN, "%s%u", password, salt);
+    if (NULL == MD5(md5_str_buf, md5_str_buf_len, md5)) {
+        DBG_PRINTF(DBG_ERROR, "md5 error! str: %s, len: %d\n",
+                md5_str_buf,
+                md5_str_buf_len);
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+int backend_challenge_process(struct backend_sk_node *sk)
+{
+    struct notify_node *p_recv_node = sk->p_recv_node;
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
+    struct challenge_data *p_data = (struct challenge_data *)(p_hdr + 1);
+
+    uint32_t salt = ntohl(p_data->salt);
+    uint8_t md5[64] = {0};
+
+    if (FAIL == user_make_md5(md5, g_ctx.password, salt)) {
+        return FAIL;
+    }
+
+    sk->p_recv_node = NULL;
+
+    p_recv_node->type = PIPE_NOTIFY_TYPE_SEND;
+    p_recv_node->pos  = 0;
+
+    uint16_t                total_len = sizeof(struct backend_hdr);
+    p_hdr   = (struct backend_hdr *)p_recv_node->buf;
+    tlv_node_t              *p_tlv   = (tlv_node_t *)(p_hdr + 1);
+
+    p_tlv = tlv_node_fill(p_tlv, TLV_TYPE_USER_NAME, g_ctx.user_name);
+    p_tlv = tlv_node_fill_with_length(p_tlv, TLV_TYPE_MD5, md5, 32);
+    total_len            += (char *)p_tlv - (char *)p_data;
+
+    p_hdr->magic        = htons(BACKEND_MAGIC);
+    p_hdr->type         = MSG_TYPE_AUTH;
+    p_hdr->total_len    = htons(total_len);
+    p_recv_node->end  = total_len;
+
+    list_add_tail(&p_recv_node->list_head, &sk->send_list);
+    sk->write_cb((void *)sk);
+
+    return SUCCESS;
+}
+
+int backend_auth_ack_process(struct backend_sk_node *sk)
+{
+    struct notify_node *p_recv_node = sk->p_recv_node;
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
+    struct auth_ack_data *p_data = (struct auth_ack_data *)(p_hdr + 1);
+    int status = ntohl(p_data->status);
+
+    p_recv_node->pos = p_recv_node->end;
+    if (status == FAIL) {
+        DBG_PRINTF(DBG_ERROR, "auth failed!\n");
+    } else {
+        DBG_PRINTF(DBG_ERROR, "auth success!\n");
+    }
+    return status;
+}
+
 int backend_deal_read_data_process(struct backend_sk_node *sk)
 {
     struct notify_node *p_recv_node = sk->p_recv_node;
     struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
 
     switch (p_hdr->type) {
+
+    case MSG_TYPE_SEND_DATA:
+        backend_send_data_process(sk);
+        break;
+
     case MSG_TYPE_HEART_BEAT_ACK:
         p_recv_node->end = p_recv_node->pos = 0;
         DBG_PRINTF(DBG_WARNING, "socket %u:%d, heart beat recved\n",
@@ -208,12 +285,17 @@ int backend_deal_read_data_process(struct backend_sk_node *sk)
                 sk->fd);
         break;
 
-    case MSG_TYPE_SEND_DATA:
-        backend_send_data_process(sk);
+    case MSG_TYPE_CHALLENGE:
+        backend_challenge_process(sk);
+        break;
+
+    case MSG_TYPE_AUTH_ACK:
+        return backend_auth_ack_process(sk);
         break;
 
     default:
-        sk->exit_cb(sk);
+        DBG_PRINTF(DBG_WARNING, "unknown msg type %d\n", p_hdr->type);
+        return FAIL;
         break;
     }
 
@@ -315,7 +397,10 @@ void backend_outer_socket_read_cb(void *v)
 
             if (n_recv == total_len) {
                 log_dump_hex((const uint8_t *)p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
-                backend_deal_read_data_process(sk);
+                if (FAIL == backend_deal_read_data_process(sk)) {
+                    sk->exit_cb(sk);
+                    break;
+                }
                 continue;
             }
 

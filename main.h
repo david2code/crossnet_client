@@ -28,16 +28,19 @@
 #define HOST_MAX_LEN            100
 #define USER_NAME_MAX_LEN       100
 #define PASSWORD_MAX_LEN        100
+#define LOG_FILE_NAME_MAX_LEN   100
 
 struct ctx {
     char        server_ip[HOST_MAX_LEN + 1];
     uint16_t    server_port;
 
     char        user_name[USER_NAME_MAX_LEN + 1];
-    char        password[USER_NAME_MAX_LEN + 1];
+    char        password[PASSWORD_MAX_LEN + 1];
 
     char        my_ip[HOST_MAX_LEN + 1];
     uint16_t    my_port;
+
+    char        log_file[LOG_FILE_NAME_MAX_LEN + 1];
 };
 
 struct list_table {

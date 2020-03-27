@@ -95,14 +95,22 @@ struct backend_work_thread_table {
     struct heap_tree        heap;
 };
 
-#define BACKEND_MAGIC           0x5a5a
+#define BACKEND_MAGIC               0x5a5a
 #define BACKEND_RESERVE_HDR_SIZE    100
+typedef enum{
+    TLV_TYPE_USER_NAME       = 0,
+    TLV_TYPE_PASSWORD        = 1,
+    TLV_TYPE_MD5             = 2,
+    TLV_TYPE_MY_DOMAIN       = 3,
+    TLV_TYPE_HOST            = 4, 
+}tlv_type;
 
 enum msg_type {
     MSG_TYPE_HEART_BEAT,
     MSG_TYPE_HEART_BEAT_ACK,
-    MSG_TYPE_HEART_CHALLENGE,
-    MSG_TYPE_HEART_BEAT_ACK,
+    MSG_TYPE_CHALLENGE,
+    MSG_TYPE_AUTH,
+    MSG_TYPE_AUTH_ACK,
     MSG_TYPE_SEND_DATA,
     MSG_TYPE_MAX,
 };
@@ -117,6 +125,14 @@ struct backend_hdr {
 
 struct backend_data {
     uint32_t  session_id;
+}__attribute__((packed));
+
+struct challenge_data {
+    uint32_t  salt;
+}__attribute__((packed));
+
+struct auth_ack_data {
+    int  status;
 }__attribute__((packed));
 
 int backend_init();

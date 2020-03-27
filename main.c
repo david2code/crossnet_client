@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <pthread.h>
+#include <json-c/json.h>
 #include <sys/prctl.h>
 
 #include "main.h"
@@ -132,87 +133,164 @@ int init()
 
     return 0;
 }
-#if 0
-void parse_json_result(char *result, struct ip_info_node_t *p_node)
-{
-    json_object *obj = json_tokener_parse(result);
-    if (!obj)
-    {   
-        return;
-    }
 
-    json_type type = json_object_get_type(obj);
-    if(type != json_type_object)
-    {   
+int parse_json_config(char *config_str)
+{
+    int ret = SUCCESS;
+    struct ctx *p_ctx = &g_ctx;
+
+    json_object *obj = json_tokener_parse(config_str);
+    if (!obj) {   
+        printf("json_parse_error\n");
+        ret = FAIL;
         goto JSON_ERROR_END;
     }
 
-    json_object_object_foreach(obj, key, val)
-    {   
-        if (strcmp(key, "code") == 0)
-        {   
-            int code = -1;
-            json_type type =json_object_get_type(val);
-            if(type == json_type_int)
-                code = json_object_get_int(val);
+    json_type type = json_object_get_type(obj);
+    if(type != json_type_object) {   
+        printf("json_type: %d\n", type);
+        ret = FAIL;
+        goto JSON_ERROR_END;
+    }
 
-            if (code != 0)
-            {   
+    json_object_object_foreach(obj, key, val) {   
+        json_type type =json_object_get_type(val);
+
+        if (strcmp(key, "server_ip") == 0) {   
+            if(type == json_type_string) {
+                snprintf(p_ctx->server_ip, HOST_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->server_ip[HOST_MAX_LEN] = 0;
+            } else {
+                ret = FAIL;
                 goto JSON_ERROR_END;
             }
-        }
-        else if (strcmp(key, "data") == 0)
-        {   
-            json_type type =json_object_get_type(val);
-            if(type == json_type_object)
-            {   
-                parse_json_data(val, p_node);
+        } else if (strcmp(key, "server_port") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->server_port = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
             }
+        } else if (strcmp(key, "my_ip") == 0) {   
+            if(type == json_type_string) {
+                snprintf(p_ctx->my_ip, HOST_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->my_ip[HOST_MAX_LEN] = 0;
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "my_port") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->my_port = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "user_name") == 0) {   
+            if(type == json_type_string) {
+                snprintf(p_ctx->user_name, USER_NAME_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->user_name[USER_NAME_MAX_LEN] = 0;
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "password") == 0) {   
+            if(type == json_type_string) {
+                snprintf(p_ctx->password, PASSWORD_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->password[PASSWORD_MAX_LEN] = 0;
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "log_file") == 0) {   
+            if(type == json_type_string) {
+                snprintf(p_ctx->log_file, LOG_FILE_NAME_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->log_file[LOG_FILE_NAME_MAX_LEN] = 0;
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else {
+            printf("unknown json key: %s\n", key);
         }
     }
 
 JSON_ERROR_END:
     json_object_put(obj);
-}
-#endif
 
-int load_config_from_file(char *config)
+    return ret;
+}
+
+int load_config_from_json_file(char *config)
 {
     FILE  *fp        = NULL;
     char buffer[2048] = {0};
     int ret = 0;
 
-    if (config == NULL)
-        return -1;
+    if (config == NULL) {
+        printf("config file not found!\n");
+        return FAIL;
+    }
 
     if (NULL == (fp = fopen(config, "r"))) {
-        DBG_PRINTF( DBG_WARNING, "open %s failed!\n", config);
-        return -1;
+        printf("open %s failed!\n", config);
+        return FAIL;
     }
 
     ret = fread(buffer, 1, 2048, fp);
     if (ret <= 0) {
-        return -1;
+        printf("config file %s empty!\n", config);
+        return FAIL;
     }
     if (ret >= 2048) {
-        return -1;
+        printf("config file %s too big!\n", config);
+        return FAIL;
     }
 
-    printf("%d\n", ret);
-    printf("%s\n", buffer);
-
-    return 0;
+    //printf("%d\n", ret);
+    //printf("%s\n", buffer);
+    return parse_json_config(buffer);
 }
 
-void print_ctx()
+int check_and_print_ctx()
 {
     struct ctx *p_ctx = &g_ctx;
 
+    if (!p_ctx->server_ip[0]) {
+        printf("server_ip should not be empty!\n");
+        return FAIL;
+    }
+    if (p_ctx->server_port < 1) {
+        printf("server_port should not be zero!\n");
+        return FAIL;
+    }
+    if (!p_ctx->user_name[0]) {
+        printf("user_name should not be empty!\n");
+        return FAIL;
+    }
+    if (!p_ctx->password[0]) {
+        printf("password should not be empty!\n");
+        return FAIL;
+    }
+    if (!p_ctx->my_ip[0]) {
+        printf("my_ip should not be empty!\n");
+        return FAIL;
+    }
+    if (p_ctx->my_port < 1) {
+        printf("my_port should not be zero!\n");
+        return FAIL;
+    }
+
+    printf("config success!\n");
     printf("server: %s\n", p_ctx->server_ip);
+    printf("port: %hu\n", p_ctx->server_port);
     printf("user_name: %s\n", p_ctx->user_name);
     printf("password: %s\n", p_ctx->password);
     printf("my_ip: %s\n", p_ctx->my_ip);
     printf("my_port: %hu\n", p_ctx->my_port);
+    printf("log_file: %s\n", p_ctx->log_file);
+
+    return SUCCESS;
 }
 
 /*
@@ -241,6 +319,8 @@ int main(int argc, char **argv)
         {NULL,      0,                  NULL,   0}
     };
 
+    memset(&g_ctx, 0, sizeof(struct ctx));
+    strncpy(g_ctx.log_file, "crossnet_client.log", LOG_FILE_NAME_MAX_LEN);
     while (-1 != (c = getopt_long(argc, argv, "dc:v:s:u:p:I:P:", long_options, &option_index))) {
         switch (c) {
         case 'd':
@@ -312,19 +392,20 @@ int main(int argc, char **argv)
         }
     }
 
-    if (-1 == load_config_from_file(config)) {
+    if (FAIL == load_config_from_json_file(config)) {
         exit(EXIT_FAILURE);
     }
 
-    print_ctx();
+    if (FAIL == check_and_print_ctx()) {
+        exit(EXIT_FAILURE);
+    }
 
-    log_init("/var/log/crossnet_client.log");
+    log_init(g_ctx.log_file);
 
     if (daemon) {
         main_daemon();
     }
 
-    //display_g_main_config();
 
     init();
 
