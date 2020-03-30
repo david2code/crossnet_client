@@ -752,10 +752,10 @@ int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node)
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
 
     int new_socket = 0;
-    uint32_t inner_ip = get_ip_by_hostname(INNER_HOST);
+    uint32_t inner_ip = get_ip_by_hostname(g_ctx.my_ip);
     if (inner_ip == 0) {
         DBG_PRINTF(DBG_WARNING, "host parse failed %s\n",
-                INNER_HOST);
+                g_ctx.my_ip);
 
         return -1;
     }
@@ -765,11 +765,11 @@ int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node)
         return NULL;
     }
 #endif
-    int ret = create_socket_to_server(inner_ip, INNER_PORT, 0, &new_socket);
+    int ret = create_socket_to_server(inner_ip, g_ctx.my_port, 0, &new_socket);
     if (ret == -1) {
         DBG_PRINTF(DBG_ERROR, "create connect socket failed at %s:%d, errnum: %d\n",
-                INNER_HOST,
-                INNER_PORT,
+                g_ctx.my_ip,
+                g_ctx.my_port,
                 ret);
         return -1;
     }
@@ -809,7 +809,8 @@ int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node)
     add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN | EPOLLOUT | EPOLLERR);
 
     DBG_PRINTF(DBG_ERROR, "create connect socket success to %s:%d, socket:%d, errnum: %d\n",
-            INNER_HOST,
+            g_ctx.my_ip,
+            g_ctx.my_port,
             INNER_PORT,
             p_node->fd,
             ret);
@@ -1099,7 +1100,7 @@ void *backend_process(void *arg)
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
     time_t last_time = time(NULL);
 
-    prctl(PR_SET_NAME, p_table->table_name);
+    prctl(PR_SET_NAME, __FUNCTION__);
 
     DBG_PRINTF(DBG_WARNING, "%s enter timerstamp %d\n", p_table->table_name, last_time);
 
@@ -1110,6 +1111,7 @@ void *backend_process(void *arg)
         for( i= 0; i < nfds; ++i) {
             struct backend_sk_node *sk = (struct backend_sk_node *)(p_table->events[i].data.ptr);
 
+            //DBG_PRINTF(DBG_ERROR, "%u:%d\n", sk->seq_id, sk->fd);
             if(p_table->events[i].events & EPOLLIN) {
                 sk->read_cb(sk);
             } else if(p_table->events[i].events & EPOLLOUT) {
