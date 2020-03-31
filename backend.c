@@ -342,8 +342,10 @@ void backend_outer_socket_read_cb(void *v)
 {
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
 
+#if 0
     if (sk->event != STE_CONNECTED)
         return;
+#endif
 
     sk->last_active = time(NULL);
     while(1) {
@@ -431,6 +433,12 @@ void backend_outer_socket_read_cb(void *v)
                     sk->seq_id,
                     sk->fd);
             continue;
+        } else if (errno == ECONNREFUSED) {
+            DBG_PRINTF(DBG_ERROR, "socket %u:%d connect refused\n",
+                    sk->seq_id,
+                    sk->fd);
+            sk->exit_cb((void *)sk);
+            break;
         } else {
             DBG_PRINTF(DBG_NORMAL, "socket %u:%d errno: %d\n",
                     sk->seq_id,
@@ -658,22 +666,21 @@ void backend_outer_socket_exit_cb(void *v)
         free_notify_node(p_entry);
     }
 
+    if (g_main_debug >= DBG_WARNING) {
+        DBG_PRINTF(DBG_WARNING, "exit seq_id %u:%d connect to server, ttl: %d\n",
+                sk->seq_id,
+                sk->fd,
+                time(NULL) - sk->last_active);
+    }
+
+    sk->fd = 0;
+#if 1
     sk->event = STE_INIT;
     sk->timer.timeout = time(NULL) + BACKEND_SOCKET_RECONNECT_TIMEOUT;
     sk->timer.hole = BACKEND_HEAP_MAX_SIZE;
     add_heap_timer(&p_table->heap, &sk->timer);
+#endif
 
-    if (g_main_debug >= DBG_WARNING) {
-        char ip_str[30];
-        uint32_t ip = htonl(sk->ip);
-        DBG_PRINTF(DBG_WARNING, "exit seq_id %u:%d connect from %s:%d, alive_cnt: %u, ttl: %d\n",
-                sk->seq_id,
-                sk->fd,
-                inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str)),
-                sk->port,
-                sk->alive_cnt,
-                time(NULL) - sk->last_active);
-    }
 }
 
 void backend_socket_exit_cb(void *v)
@@ -991,6 +998,9 @@ void backend_outer_event_process(struct backend_work_thread_table *p_table, stru
         /*
          * connecting timeout, back to STE_INIT mode retry again
          */
+        DBG_PRINTF(DBG_ERROR, "socket %d seq_id %u timeout\n",
+                p_entry->seq_id,
+                p_entry->fd);
         p_entry->exit_cb(p_entry);
 
         break;
@@ -1111,7 +1121,6 @@ void *backend_process(void *arg)
         for( i= 0; i < nfds; ++i) {
             struct backend_sk_node *sk = (struct backend_sk_node *)(p_table->events[i].data.ptr);
 
-            //DBG_PRINTF(DBG_ERROR, "%u:%d\n", sk->seq_id, sk->fd);
             if(p_table->events[i].events & EPOLLIN) {
                 sk->read_cb(sk);
             } else if(p_table->events[i].events & EPOLLOUT) {
