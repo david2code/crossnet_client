@@ -6,17 +6,7 @@
 
 #define USER_NUM      100
 
-#define BACKEND_HOST   "www.code.com"
-#define BACKEND_PORT   66
 #define BACKEND_WORK_THREAD_NUM    4
-
-#if 0
-#define INNER_HOST   "www.david.com"
-#define INNER_PORT   8080 
-#else
-#define INNER_HOST   "xqctk.jtys.sz.gov.cn"
-#define INNER_PORT   80
-#endif
 
 #define TABLE_NAME_LEN  50
 #define MAX_BUFF_SIZE            2048

@@ -1,8 +1,8 @@
 {
-    "server_ip": "www.code.com",
-    "server_port": 81,
+    "server_ip": "www.david2code.com",
+    "server_port": 46,
 
-    "my_ip": "www.code.com",
+    "my_ip": "192.168.2.162",
     "my_port": 80,
     "user_name": "yikeshu",
     "password": "12345678",

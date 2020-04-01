@@ -784,7 +784,7 @@ int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node)
     time_t now = time(NULL);
     p_node->fd              = new_socket;
     p_node->ip              = inner_ip;
-    p_node->port            = INNER_PORT;
+    p_node->port            = g_ctx.my_port;
     p_node->p_recv_node     = NULL;
     p_node->last_active     = now;
     p_node->last_hb_time    = 0;
@@ -815,10 +815,9 @@ int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node)
     set_none_block(p_node->fd);
     add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN | EPOLLOUT | EPOLLERR);
 
-    DBG_PRINTF(DBG_ERROR, "create connect socket success to %s:%d, socket:%d, errnum: %d\n",
+    DBG_PRINTF(DBG_ERROR, "create connect socket success to %s:%hu, socket:%d, errnum: %d\n",
             g_ctx.my_ip,
             g_ctx.my_port,
-            INNER_PORT,
             p_node->fd,
             ret);
 
@@ -836,11 +835,11 @@ int backend_socket_connect_to_server(struct backend_sk_node *p_node)
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
 
     int new_socket = 0;
-    int ret = create_socket_to_server_by_host(BACKEND_HOST, BACKEND_PORT, 0, &new_socket);
+    int ret = create_socket_to_server_by_host(g_ctx.server_ip, g_ctx.server_port, 0, &new_socket);
     if (ret == -1) {
         DBG_PRINTF(DBG_ERROR, "create connect socket failed at %s:%d, errnum: %d\n",
-                BACKEND_HOST,
-                BACKEND_PORT,
+                g_ctx.server_ip,
+                g_ctx.server_port,
                 ret);
         return -1;
     }
@@ -871,8 +870,8 @@ int backend_socket_connect_to_server(struct backend_sk_node *p_node)
 
     DBG_PRINTF(DBG_ERROR, "create connect socket success %d to %s:%d, socket:%d, errnum: %d\n",
             p_node->seq_id,
-            BACKEND_HOST,
-            BACKEND_PORT,
+            g_ctx.server_ip,
+            g_ctx.server_port,
             p_node->fd,
             ret);
 
@@ -924,8 +923,8 @@ int backend_init_to_server_socket()
 
     DBG_PRINTF(DBG_ERROR, "%p init timer success to %s:%d, socket:%d, errnum: %d\n",
             p_node,
-            BACKEND_HOST,
-            BACKEND_PORT,
+            g_ctx.server_ip,
+            g_ctx.server_port,
             p_node->fd,
             ret);
 
