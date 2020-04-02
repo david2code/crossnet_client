@@ -185,7 +185,7 @@ int backend_send_data_process(struct backend_sk_node *sk)
         sk->p_recv_node = NULL;
 
         p_recv_node->pos += hdr_len;
-        DBG_DUMP_HEX(DBG_NORMAL, p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+        //DBG_DUMP_HEX(DBG_NORMAL, p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
         list_add_tail(&p_recv_node->list_head, &p_node->send_list);
         if (p_node->event == STE_CONNECTED)
             p_node->write_cb(p_node);
@@ -392,13 +392,13 @@ void backend_outer_socket_read_cb(void *v)
                         total_len,
                         p_recv_node->pos,
                         p_recv_node->end);
-                DBG_DUMP_HEX(DBG_NORMAL, (const uint8_t *)p_hdr, n_recv);
+                //DBG_DUMP_HEX(DBG_NORMAL, (const uint8_t *)p_hdr, n_recv);
                 sk->exit_cb((void *)sk);
                 break;
             }
 
             if (n_recv == total_len) {
-                log_dump_hex((const uint8_t *)p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+                //log_dump_hex((const uint8_t *)p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
                 if (FAIL == backend_deal_read_data_process(sk)) {
                     sk->exit_cb(sk);
                     break;
@@ -558,7 +558,7 @@ void backend_socket_write_cb(void *v)
             nwrite = send(fd, p_entry->buf + p_entry->pos, to_write, 0);
 
             if (g_main_debug >= DBG_NORMAL) {
-                log_dump_hex(p_entry->buf + p_entry->pos, to_write);
+                //log_dump_hex(p_entry->buf + p_entry->pos, to_write);
                 DBG_PRINTF(DBG_CLOSE, "seq_id %u:%d nwrite: %d, front_listen_id %u\n",
                         seq_id,
                         fd,
