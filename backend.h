@@ -17,7 +17,7 @@
 
 #define BACKEND_SOCKET_HEART_BEAT_TIMEOUT           10
 
-#define BACKEND_SOCKET_TIMEOUT                        30
+#define BACKEND_SOCKET_TIMEOUT                        60
 #define BACKEND_SOCKET_RECONNECT_TIMEOUT              2
 #define BACKEND_SOCKET_CONNECTING_TIMEOUT             5
 #define BACKEND_SOCKET_CONNECTED_TIMEOUT              5
