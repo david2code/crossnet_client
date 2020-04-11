@@ -21,7 +21,7 @@ extern int h_errno;
 #include <zlib.h>
 #include <assert.h>
 #include <sys/ioctl.h>
-#include <iconv.h>
+//#include <iconv.h>
 
 #include "misc.h"
 
@@ -1207,6 +1207,7 @@ inline uint32_t  get_network_from_ip(uint32_t ip)
     #endif
 }
 
+#if 0
 int code_convert( const char* from_charset,
                   const char* to_charset,
                   char* inbuf,
@@ -1233,3 +1234,4 @@ int code_convert( const char* from_charset,
     iconv_close( cd );
     return 0;
 }
+#endif

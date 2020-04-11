@@ -321,7 +321,7 @@ int main(int argc, char **argv)
 
     memset(&g_ctx, 0, sizeof(struct ctx));
     strncpy(g_ctx.log_file, "crossnet_client.log", LOG_FILE_NAME_MAX_LEN);
-    while (-1 != (c = getopt_long(argc, argv, "dc:v:s:u:p:I:P:", long_options, &option_index))) {
+    while (-1 != (c = getopt_long(argc, argv, "dc:vs:u:p:I:P:", long_options, &option_index))) {
         switch (c) {
         case 'd':
             daemon = true;
@@ -333,7 +333,7 @@ int main(int argc, char **argv)
             break;
 
         case 'v':
-            printf("%s\n", VERSION);
+            printf("%s\n", "sdfs");
             exit(0);
             break;
 
