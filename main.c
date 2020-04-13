@@ -19,6 +19,7 @@
 #include "log.h"
 #include "backend.h"
 #include "unique_id.h"
+#include "config.h"
 
 int g_main_running = 1;
 int g_main_debug = DBG_NORMAL;
@@ -289,6 +290,8 @@ int check_and_print_ctx()
     printf("my_ip: %s\n", p_ctx->my_ip);
     printf("my_port: %hu\n", p_ctx->my_port);
     printf("log_file: %s\n", p_ctx->log_file);
+    printf("primary_ver: %hhu\n", p_ctx->primary_ver);
+    printf("secondary_ver: %hhu\n", p_ctx->secondary_ver);
 
     return SUCCESS;
 }
@@ -302,30 +305,22 @@ int check_and_print_ctx()
  */
 int main(int argc, char **argv)
 {
-    bool daemon = false;
+    bool daemon = true;
     char *config = "config.json";
     int len;
 
     int c, option_index;
     static struct option long_options[] = {
-        {"daemon",  no_argument,        NULL,   'd'},
         {"config",  required_argument,  NULL,   'c'},
         {"version", no_argument,        NULL,   'v'},
-        {"server",  required_argument,  NULL,   's'},
-        {"user_name",  required_argument,  NULL,   'u'},
-        {"password",  required_argument,  NULL,   'p'},
-        {"my_ip",  required_argument,  NULL,   'I'},
-        {"my_port",  required_argument,  NULL,   'P'},
         {NULL,      0,                  NULL,   0}
     };
 
     memset(&g_ctx, 0, sizeof(struct ctx));
     strncpy(g_ctx.log_file, "crossnet_client.log", LOG_FILE_NAME_MAX_LEN);
-    while (-1 != (c = getopt_long(argc, argv, "dc:vs:u:p:I:P:", long_options, &option_index))) {
+    sscanf(VERSION, "%hhu.%hhu", &g_ctx.primary_ver, &g_ctx.secondary_ver);
+    while (-1 != (c = getopt_long(argc, argv, "c:v", long_options, &option_index))) {
         switch (c) {
-        case 'd':
-            daemon = true;
-            break;
 
         case 'c':
             config = optarg;
@@ -333,57 +328,8 @@ int main(int argc, char **argv)
             break;
 
         case 'v':
-            printf("%s\n", "sdfs");
+            printf("%s\n", VERSION);
             exit(0);
-            break;
-
-        case 's':
-            len = strlen(optarg);
-            if (len > HOST_MAX_LEN) {
-                printf("%s too much long, should less than %d charaters\n", optarg, HOST_MAX_LEN);
-                exit(0);
-            } else {
-                strncpy(g_ctx.server_ip, optarg, HOST_MAX_LEN);
-                g_ctx.server_ip[HOST_MAX_LEN] = 0;
-            }
-            break;
-
-        case 'u':
-            len = strlen(optarg);
-            if (len > USER_NAME_MAX_LEN) {
-                printf("%s too much long, should less than %d charaters\n", optarg, USER_NAME_MAX_LEN);
-                exit(0);
-            } else {
-                strncpy(g_ctx.user_name, optarg, USER_NAME_MAX_LEN);
-                g_ctx.user_name[USER_NAME_MAX_LEN] = 0;
-            }
-            break;
-
-        case 'p':
-            len = strlen(optarg);
-            if (len > PASSWORD_MAX_LEN) {
-                printf("%s too much long, should less than %d charaters\n", optarg, PASSWORD_MAX_LEN);
-                exit(0);
-            } else {
-                strncpy(g_ctx.password, optarg, PASSWORD_MAX_LEN);
-                g_ctx.password[PASSWORD_MAX_LEN] = 0;
-            }
-            break;
-
-
-        case 'I':
-            len = strlen(optarg);
-            if (len > HOST_MAX_LEN) {
-                printf("%s too much long, should less than %d charaters\n", optarg, HOST_MAX_LEN);
-                exit(0);
-            } else {
-                strncpy(g_ctx.my_ip, optarg, HOST_MAX_LEN);
-                g_ctx.my_ip[HOST_MAX_LEN] = 0;
-            }
-            break;
-
-        case 'P':
-            sscanf(optarg, "%hu", &g_ctx.my_port);
             break;
 
         default:

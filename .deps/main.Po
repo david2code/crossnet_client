@@ -54,7 +54,7 @@ main.o: main.c /usr/include/stdc-predef.h /usr/include/stdlib.h \
  /usr/lib/gcc/x86_64-redhat-linux/4.8.5/include/syslimits.h \
  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
- /usr/include/bits/posix2_lim.h
+ /usr/include/bits/posix2_lim.h config.h
 
 /usr/include/stdc-predef.h:
 
@@ -281,3 +281,5 @@ unique_id.h:
 /usr/include/linux/limits.h:
 
 /usr/include/bits/posix2_lim.h:
+
+config.h:

@@ -31,6 +31,9 @@ struct ctx {
     uint16_t    my_port;
 
     char        log_file[LOG_FILE_NAME_MAX_LEN + 1];
+
+    uint8_t     primary_ver;
+    uint8_t     secondary_ver;
 };
 
 struct list_table {
