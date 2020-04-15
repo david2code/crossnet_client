@@ -267,6 +267,24 @@ int backend_auth_ack_process(struct backend_sk_node *sk)
     return status;
 }
 
+int backend_force_offline_process(struct backend_sk_node *sk)
+{
+    struct notify_node *p_recv_node = sk->p_recv_node;
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
+    struct force_offline_data *p_data = (struct force_offline_data *)(p_hdr + 1);
+    //uint32_t ip = ntohl(p_data->ip);
+
+    p_recv_node->pos = p_recv_node->end;
+
+    if (g_main_debug >= DBG_ERROR) {
+        char ip_str[30];
+        uint32_t ip = p_data->ip;
+        DBG_PRINTF(DBG_ERROR, "force offline: you have already login in at ip : %s\n",
+                inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str)));
+    }
+    return FAIL;
+}
+
 int backend_deal_read_data_process(struct backend_sk_node *sk)
 {
     struct notify_node *p_recv_node = sk->p_recv_node;
@@ -291,6 +309,10 @@ int backend_deal_read_data_process(struct backend_sk_node *sk)
 
     case MSG_TYPE_AUTH_ACK:
         return backend_auth_ack_process(sk);
+        break;
+
+    case MSG_TYPE_FORCE_OFFLINE:
+        return backend_force_offline_process(sk);
         break;
 
     default:

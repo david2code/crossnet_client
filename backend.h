@@ -112,6 +112,7 @@ enum msg_type {
     MSG_TYPE_AUTH,
     MSG_TYPE_AUTH_ACK,
     MSG_TYPE_SEND_DATA,
+    MSG_TYPE_FORCE_OFFLINE,
     MSG_TYPE_MAX,
 };
 
@@ -129,6 +130,10 @@ struct backend_data {
 
 struct challenge_data {
     uint32_t  salt;
+}__attribute__((packed));
+
+struct force_offline_data {
+    uint32_t  ip;
 }__attribute__((packed));
 
 struct auth_ack_data {
