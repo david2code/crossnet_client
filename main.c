@@ -157,10 +157,10 @@ int parse_json_config(char *config_str)
     json_object_object_foreach(obj, key, val) {   
         json_type type =json_object_get_type(val);
 
-        if (strcmp(key, "server_ip") == 0) {   
+        if (strcmp(key, "server_host") == 0) {   
             if(type == json_type_string) {
-                snprintf(p_ctx->server_ip, HOST_MAX_LEN + 1, "%s", json_object_get_string(val));
-                p_ctx->server_ip[HOST_MAX_LEN] = 0;
+                snprintf(p_ctx->server_host, HOST_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->server_host[HOST_MAX_LEN] = 0;
             } else {
                 ret = FAIL;
                 goto JSON_ERROR_END;
@@ -172,10 +172,10 @@ int parse_json_config(char *config_str)
                 ret = FAIL;
                 goto JSON_ERROR_END;
             }
-        } else if (strcmp(key, "my_ip") == 0) {   
+        } else if (strcmp(key, "my_host") == 0) {   
             if(type == json_type_string) {
-                snprintf(p_ctx->my_ip, HOST_MAX_LEN + 1, "%s", json_object_get_string(val));
-                p_ctx->my_ip[HOST_MAX_LEN] = 0;
+                snprintf(p_ctx->my_host, HOST_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->my_host[HOST_MAX_LEN] = 0;
             } else {
                 ret = FAIL;
                 goto JSON_ERROR_END;
@@ -257,8 +257,8 @@ int check_and_print_ctx()
 {
     struct ctx *p_ctx = &g_ctx;
 
-    if (!p_ctx->server_ip[0]) {
-        printf("server_ip should not be empty!\n");
+    if (!p_ctx->server_host[0]) {
+        printf("server_host should not be empty!\n");
         return FAIL;
     }
     if (p_ctx->server_port < 1) {
@@ -273,8 +273,8 @@ int check_and_print_ctx()
         printf("password should not be empty!\n");
         return FAIL;
     }
-    if (!p_ctx->my_ip[0]) {
-        printf("my_ip should not be empty!\n");
+    if (!p_ctx->my_host[0]) {
+        printf("my_host should not be empty!\n");
         return FAIL;
     }
     if (p_ctx->my_port < 1) {
@@ -283,11 +283,11 @@ int check_and_print_ctx()
     }
 
     printf("config success!\n");
-    printf("server: %s\n", p_ctx->server_ip);
+    printf("server: %s\n", p_ctx->server_host);
     printf("port: %hu\n", p_ctx->server_port);
     printf("user_name: %s\n", p_ctx->user_name);
     printf("password: %s\n", p_ctx->password);
-    printf("my_ip: %s\n", p_ctx->my_ip);
+    printf("my_host: %s\n", p_ctx->my_host);
     printf("my_port: %hu\n", p_ctx->my_port);
     printf("log_file: %s\n", p_ctx->log_file);
     printf("primary_ver: %hhu\n", p_ctx->primary_ver);

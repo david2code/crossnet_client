@@ -21,13 +21,15 @@
 #define LOG_FILE_NAME_MAX_LEN   100
 
 struct ctx {
-    char        server_ip[HOST_MAX_LEN + 1];
+    char        server_host[HOST_MAX_LEN + 1];
+    uint32_t    server_ip;
     uint16_t    server_port;
 
     char        user_name[USER_NAME_MAX_LEN + 1];
     char        password[PASSWORD_MAX_LEN + 1];
 
-    char        my_ip[HOST_MAX_LEN + 1];
+    char        my_host[HOST_MAX_LEN + 1];
+    uint32_t    my_ip;
     uint16_t    my_port;
 
     char        log_file[LOG_FILE_NAME_MAX_LEN + 1];

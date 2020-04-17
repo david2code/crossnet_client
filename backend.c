@@ -281,6 +281,7 @@ int backend_force_offline_process(struct backend_sk_node *sk)
         uint32_t ip = p_data->ip;
         DBG_PRINTF(DBG_ERROR, "force offline: you have already login in at ip : %s\n",
                 inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str)));
+        exit(EXIT_FAILURE);
     }
     return FAIL;
 }
@@ -781,23 +782,25 @@ int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node)
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
 
     int new_socket = 0;
-    uint32_t inner_ip = get_ip_by_hostname(g_ctx.my_ip);
+    uint32_t inner_ip = get_ip_by_hostname(g_ctx.my_host);
     if (inner_ip == 0) {
         DBG_PRINTF(DBG_WARNING, "host parse failed %s\n",
-                g_ctx.my_ip);
-
+                g_ctx.my_host);
         return -1;
     }
-    //TODO forbidden circle connect
-#if 0
-    if (inner_ip == server_ip) {
-        return NULL;
+    g_ctx.my_ip = inner_ip;
+    //forbidden circle connect
+    if (inner_ip == g_ctx.server_ip) {
+        DBG_PRINTF(DBG_WARNING, "host %s, config error\n",
+                g_ctx.my_host);
+        exit(EXIT_FAILURE);
+        return -1;
     }
-#endif
+
     int ret = create_socket_to_server(inner_ip, g_ctx.my_port, 0, &new_socket);
     if (ret == -1) {
         DBG_PRINTF(DBG_ERROR, "create connect socket failed at %s:%d, errnum: %d\n",
-                g_ctx.my_ip,
+                g_ctx.my_host,
                 g_ctx.my_port,
                 ret);
         return -1;
@@ -838,7 +841,7 @@ int backend_socket_connect_to_inner_server(struct backend_sk_node *p_node)
     add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN | EPOLLOUT | EPOLLERR);
 
     DBG_PRINTF(DBG_ERROR, "create connect socket success to %s:%hu, socket:%d, errnum: %d\n",
-            g_ctx.my_ip,
+            g_ctx.my_host,
             g_ctx.my_port,
             p_node->fd,
             ret);
@@ -857,10 +860,19 @@ int backend_socket_connect_to_server(struct backend_sk_node *p_node)
     struct backend_work_thread_table *p_table = &g_backend_work_thread_table;
 
     int new_socket = 0;
-    int ret = create_socket_to_server_by_host(g_ctx.server_ip, g_ctx.server_port, 0, &new_socket);
+    uint32_t outer_ip = get_ip_by_hostname(g_ctx.server_host);
+    if (outer_ip == 0) {
+        DBG_PRINTF(DBG_WARNING, "host parse failed %s\n",
+                g_ctx.server_host);
+
+        return -1;
+    }
+    g_ctx.server_ip = outer_ip;
+
+    int ret = create_socket_to_server(g_ctx.server_ip, g_ctx.server_port, 0, &new_socket);
     if (ret == -1) {
         DBG_PRINTF(DBG_ERROR, "create connect socket failed at %s:%d, errnum: %d\n",
-                g_ctx.server_ip,
+                g_ctx.server_host,
                 g_ctx.server_port,
                 ret);
         return -1;
@@ -892,7 +904,7 @@ int backend_socket_connect_to_server(struct backend_sk_node *p_node)
 
     DBG_PRINTF(DBG_ERROR, "create connect socket success %d to %s:%d, socket:%d, errnum: %d\n",
             p_node->seq_id,
-            g_ctx.server_ip,
+            g_ctx.server_host,
             g_ctx.server_port,
             p_node->fd,
             ret);
@@ -945,7 +957,7 @@ int backend_init_to_server_socket()
 
     DBG_PRINTF(DBG_ERROR, "%p init timer success to %s:%d, socket:%d, errnum: %d\n",
             p_node,
-            g_ctx.server_ip,
+            g_ctx.server_host,
             g_ctx.server_port,
             p_node->fd,
             ret);
