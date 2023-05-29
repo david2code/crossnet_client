@@ -194,11 +194,11 @@ uint32_t get_eth_ip(const char *eth_name);
 uint32_t get_addrinfo(char *host);
 unsigned long long ntohll(unsigned long long val);
 unsigned long long htonll(unsigned long long val);
-inline int uint16_t_cmp(uint16_t *a, uint16_t *b);
-inline int uint32_t_cmp(uint32_t *a, uint32_t *b);
-inline int uint64_t_cmp(uint64_t *a, uint64_t *b);
-inline int ngx_cmp(ngx_str_t *a, ngx_str_t *b);
-inline uint32_t ngx_hash(ngx_str_t *key);
+extern int uint16_t_cmp(uint16_t *a, uint16_t *b);
+extern int uint32_t_cmp(uint32_t *a, uint32_t *b);
+extern int uint64_t_cmp(uint64_t *a, uint64_t *b);
+extern int ngx_cmp(ngx_str_t *a, ngx_str_t *b);
+extern uint32_t ngx_hash(ngx_str_t *key);
 
 char *ngx_print(char *buf, int len, ngx_str_t *p_ngx_str);
 int ngx_split(ngx_str_t *orig, char sepch, ngx_str_t *part_a, ngx_str_t *part_b);
@@ -209,7 +209,7 @@ ssize_t chomp (char *buffer, size_t length);
 ssize_t chomp_ngx_str (ngx_str_t *ngx_str);
 int base64_encode( const unsigned char * bindata, unsigned char *base64, int binlength, int out_len);
 int base64_decode(const char *base64, unsigned char *bindata);
-inline uint32_t  get_network_from_ip(uint32_t ip);
+extern uint32_t  get_network_from_ip(uint32_t ip);
 int create_udp_listen_socket(uint16_t *port);
 int code_convert( const char* from_charset,
                   const char* to_charset,

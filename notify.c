@@ -21,6 +21,7 @@ struct buff_table g_notify_buff_table;
 void notify_buf_table_init()
 {
     buff_table_init(&g_notify_buff_table, NOTIFY_NODE_MAX_NUM, sizeof(struct notify_node), "g_notify_buff_table");
+    DBG_PRINTF(DBG_NORMAL, "%s ok\n", __FUNCTION__);
 }
 
 inline struct notify_node *malloc_notify_node()

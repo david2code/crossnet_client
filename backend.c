@@ -56,7 +56,7 @@ void display_g_backend_buff_table()
 
 #endif
 
-inline void backend_add_node_to_list(struct backend_sk_node *fi)
+void backend_add_node_to_list(struct backend_sk_node *fi)
 {
     DBG_PRINTF(DBG_NORMAL, "seq_id %u:%d list add %d\n",
             fi->seq_id,
@@ -69,7 +69,7 @@ inline void backend_add_node_to_list(struct backend_sk_node *fi)
     p_table->list_head[fi->type].num++;
 }
 
-inline void backend_del_node_from_list(struct backend_sk_node *fi)
+void backend_del_node_from_list(struct backend_sk_node *fi)
 {
     DBG_PRINTF(DBG_NORMAL, "seq_id %u:%d list del %d\n",
             fi->seq_id,

@@ -114,13 +114,14 @@ void sigfun(int sig)
     g_main_running = 0;
 }
 
-void signal_init ()
+void signal_init()
 {
     //signal_set (SIGINT, sigfun);
     signal_set (SIGTSTP, sigfun);
     //signal_set (SIGKILL, sigfun);
     //signal_set (SIGTERM, sigfun);
     signal_set (SIGSEGV, sigfun);
+    DBG_PRINTF(DBG_NORMAL, "%s ok\n", __FUNCTION__);
 }
 
 int init()
@@ -305,7 +306,7 @@ int check_and_print_ctx()
  */
 int main(int argc, char **argv)
 {
-    bool daemon = true;
+    bool daemon = false;
     char *config = "config.json";
     int len;
 
@@ -394,6 +395,9 @@ int main(int argc, char **argv)
         perror("Thread join failed!");
         exit(EXIT_FAILURE);
     }
+
+    DBG_PRINTF(DBG_WARNING, "exit %d\n", time(NULL));
+
 
     return 0;
 }

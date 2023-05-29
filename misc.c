@@ -565,6 +565,7 @@ ngx_strncasecmp(uint8_t *s1, uint8_t *s2, size_t n)
 
     return 0;
 }
+
 #if 1
 int char2value (char ch)
 {    
@@ -1066,7 +1067,7 @@ ssize_t chomp (char *buffer, size_t length)
     return chars;
 }
 
-ssize_t chomp_ngx_str (ngx_str_t *ngx_str)
+ssize_t chomp_ngx_str(ngx_str_t *ngx_str)
 {
     size_t chars;
 
